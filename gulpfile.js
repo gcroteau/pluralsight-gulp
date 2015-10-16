@@ -1,9 +1,9 @@
+var config = require('./gulp.config')();
 var args = require('yargs').argv;
 var gulp = require('gulp');
 var del = require('del');
 var $ = require('gulp-load-plugins')({lazy: true});
-
-var config = require('./gulp.config')();
+var port = process.env.PORT || config.defaultPort;
 
 gulp.task('vet', function() {
   log('Analyzing source with JSHint and JSCS');
@@ -56,6 +56,35 @@ gulp.task('inject', ['wiredep', 'styles'], function() {
     .src(config.index)
     .pipe($.inject(gulp.src(config.css)))
     .pipe(gulp.dest(config.client));
+});
+
+gulp.task('serve-dev', ['inject'], function() {
+  var isDev = true;
+
+  var nodeOptions = {
+      script: config.nodeServer,
+      delayTime: 1,
+      env: { // Found in src/server/app.js
+        'PORT': port,
+        'NODE_ENV': isDev ? 'dev' : 'build'
+      },
+      watch: [config.server]
+  };
+
+  return $.nodemon(nodeOptions)
+    .on('restart', ['vet'], function(ev) {
+      log('*** nodemon restarted ***');
+      log('files changed on restart:\n' + ev);
+    })
+    .on('start', function(ev) {
+      log('*** nodemon started ***');
+    })
+    .on('crash', function() {
+      log('*** nodemon crashed: script crashed for some reason ***');
+    })
+    .on('exit', function() {
+      log('*** nodemon exited cleanly ***');
+    });
 });
 
 function clean(path, done) {
