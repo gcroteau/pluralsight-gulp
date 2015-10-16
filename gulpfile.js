@@ -48,6 +48,16 @@ gulp.task('wiredep', function() {
     .pipe(gulp.dest(config.client));
 });
 
+// Does "everything": All css (even the custom that is compiled), all js
+gulp.task('inject', ['wiredep', 'styles'], function() {
+  log('Inject the bower css js and our app js into the html');
+
+  return gulp
+    .src(config.index)
+    .pipe($.inject(gulp.src(config.css)))
+    .pipe(gulp.dest(config.client));
+});
+
 function clean(path, done) {
   log('Cleaning: ' + $.util.colors.blue(path));
   del(path, done);
