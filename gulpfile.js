@@ -6,6 +6,9 @@ var del = require('del');
 var $ = require('gulp-load-plugins')({lazy: true});
 var port = process.env.PORT || config.defaultPort;
 
+gulp.task('help', $.taskListing);
+gulp.task('default', ['help']);
+
 gulp.task('vet', function() {
   log('Analyzing source with JSHint and JSCS');
   return gulp
@@ -17,7 +20,7 @@ gulp.task('vet', function() {
     .pipe($.jshint.reporter('fail'));
 });
 
-gulp.task('styles', function() {
+gulp.task('styles', ['clean-styles'], function() {
   log('Compiling Less --> CSS');
 
   return gulp
@@ -28,9 +31,38 @@ gulp.task('styles', function() {
     .pipe(gulp.dest(config.temp));
 });
 
+gulp.task('fonts', ['clean-fonts'], function() {
+  log('Copying fonts');
+
+  return gulp
+    .src(config.fonts)
+    .pipe(gulp.dest(config.build + 'fonts'));
+});
+
+gulp.task('images', ['clean-images'], function() {
+  log('Copying and compressing images');
+  return gulp
+    .src(config.images)
+    .pipe($.imagemin( {optimizationLevel: 4} )) // Do not work with .gif: https://github.com/sindresorhus/gulp-imagemin/issues/125
+    .pipe(gulp.dest(config.build + 'images'));
+});
+
+gulp.task('clean', function(done) {
+  var deleteConfig = [].concat(config.build, config.temp);
+  log('Cleaning: ' + $.util.colors.blue(deleteConfig));
+  del(deleteConfig, done);
+});
+
+gulp.task('clean-fonts', function(done) {
+  clean(config.build + 'fonts/**/*.*', done);
+});
+
+gulp.task('clean-images', function(done) {
+  clean(config.build + 'images/**/*.*', done);
+});
+
 gulp.task('clean-styles', function(done) {
-  var files = config.temp + '**/*.css';
-  clean(files, done);
+  clean(config.temp + '**/*.css', done);
 });
 
 gulp.task('less-watchers', function() {
@@ -133,7 +165,9 @@ function startBrowserSync() {
 
 function clean(path, done) {
   log('Cleaning: ' + $.util.colors.blue(path));
-  del(path, done);
+  del(path).then(function(paths) {
+    done();
+  });
 }
 
 function log(msg) {
