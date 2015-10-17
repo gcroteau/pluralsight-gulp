@@ -13,6 +13,7 @@ module.exports = function() {
     client: client,
     css: temp + 'styles.css',
     fonts: './bower_components/font-awesome/fonts/**/*.*',
+    htmltemplates: clientApp + '**/*.html',
     images: [
       client + 'images/**/*.png',
       client + 'images/**/*.jpg',
@@ -26,6 +27,14 @@ module.exports = function() {
     less: client + 'styles/styles.less',
     server: server,
     temp: temp,
+    templateCache: {
+      file: 'templates.js',
+      options: {
+        module: 'app.core',
+        standAlone: false,
+        root: 'app/'
+      }
+    },
     browerReloadDelay: 1000,
     bower: {
       json: require('./bower.json'),
