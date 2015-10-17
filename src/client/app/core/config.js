@@ -40,7 +40,7 @@
         ////////////////
 
         function configureStateHelper() {
-            var resolveAlways = {
+            var resolveAlways = { /* @ngInject */
                 ready: ready
             };
 
