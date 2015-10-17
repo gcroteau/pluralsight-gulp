@@ -1,5 +1,6 @@
 var config = require('./gulp.config')();
 var args = require('yargs').argv;
+var browserSync = require('browser-sync');
 var gulp = require('gulp');
 var del = require('del');
 var $ = require('gulp-load-plugins')({lazy: true});
@@ -75,9 +76,14 @@ gulp.task('serve-dev', ['inject'], function() {
     .on('restart', ['vet'], function(ev) {
       log('*** nodemon restarted ***');
       log('files changed on restart:\n' + ev);
+      setTimeout(function() {
+        browserSync.notify('reloading now...');
+        browserSync.reload({ stream: false });
+      }, config.browerReloadDelay);
     })
     .on('start', function(ev) {
       log('*** nodemon started ***');
+      startBrowserSync();
     })
     .on('crash', function() {
       log('*** nodemon crashed: script crashed for some reason ***');
@@ -87,10 +93,48 @@ gulp.task('serve-dev', ['inject'], function() {
     });
 });
 
+function changeEvent(event) {
+  var srcPattern = new RegExp('/.*(?=/' + config.source + ')/'); // What file has changed
+  log('File ' + event.path.replace(srcPattern, '') + ' ' + event.type);
+}
+
+function startBrowserSync() {
+  if(args.nosync || browserSync.active) {
+    return;
+  }
+  log('Starting browser-sync on port ' + port);
+
+  gulp.watch([config.less], ['styles'])
+    .on('change', function(event) { changeEvent(event); });
+
+  var options = {
+    proxy: 'localhost:' + port,
+    port: 3000,
+    files: [
+      config.client + '**/*.*',
+      '!' + config.less,
+      config.temp + '**/*.css' // temp is where the compiled css are put
+    ],
+    ghostMode: {
+      clicks: true,
+      location: false,
+      forms: true,
+      scroll: true
+    },
+    injectChanges: true, // Inject just the changed files if it can
+    logFileChanges: true,
+    logLevel: 'debug',
+    logPrefix: 'gulp-patterns',
+    notify: true,
+    reloadDelay: 0
+  };
+  browserSync(options);
+}
+
 function clean(path, done) {
   log('Cleaning: ' + $.util.colors.blue(path));
   del(path, done);
-};
+}
 
 function log(msg) {
   if(typeof(msg) === 'object') {
