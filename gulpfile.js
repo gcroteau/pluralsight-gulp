@@ -138,9 +138,43 @@ gulp.task('optimize', ['inject', 'fonts', 'images'], function() {
     .pipe($.ngAnnotate()) // If you forget to put $inject in your code, this will do it for you
     .pipe($.uglify())
     .pipe(jsAppFilter.restore())
+    .pipe($.rev()) // Versioning for Cache Bumbping -> app.js -> app-1.23413412jr.js
     .pipe(assets.restore())
-    .pipe($.useref())
+    .pipe($.useref()) // File concatenation
+    .pipe($.revReplace())
+    .pipe(gulp.dest(config.build))
+    .pipe($.rev.manifest())
     .pipe(gulp.dest(config.build));
+});
+
+/**
+* Bump the Version
+* --type=pre will bump the prerelease version *.*.*-x
+* --type=patch will bump the patch version *.*.x
+* --type=minor will bump the minor version *.x.*
+* --type=major will bump the major version x.*.*
+* --version=1.2.3 will bump will bump to a specific version and ignore other flags
+*/
+gulp.task('bump', function() { // So that you can manage the version of your website / web app
+  var msg = "Bumping versions";
+  var type = args.type;
+  var version = args.version;
+  var options = {};
+
+  if(version) {
+    options.version = version;
+    msg += ' to ' + version;
+  } else {
+    options.type = type;
+    msg += ' for a ' + type;
+  }
+  log(msg);
+
+  return gulp
+    .src(config.packages)
+    .pipe($.print())
+    .pipe($.bump(options))
+    .pipe(gulp.dest(config.root));
 });
 
 gulp.task('serve-build', ['optimize'], function() {
