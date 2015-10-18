@@ -129,6 +129,41 @@ gulp.task('build', ['optimize', 'fonts', 'images'], function() {
   notify(msg);
 });
 
+gulp.task('serve-specs', ['build-specs'], function(done) {
+  log('Running the specs runner');
+  serve(true, true);
+  done();
+});
+
+gulp.task('build-specs', ['templatecache'], function() {
+  log('Building the specs runner');
+
+  var wiredep = require('wiredep').stream;
+  var options = config.getWiredepDefaultOptions();
+  var specs = config.specs;
+  options.devDependencies = true;
+  // Because testing is a specical case, you might need the devDependencies
+  // to be referenced in the specs.html
+
+  if(args.startServers) {
+    specs = [].concat(specs, config.serverIntegrationSpecs);
+  }
+
+  return gulp
+    .src(config.specRunner)
+    .pipe(wiredep(options))
+    .pipe($.inject(gulp.src(config.testLibraries),
+      { name: 'inject:testlibraries', read: false }))
+    .pipe($.inject(gulp.src(config.js)))
+    .pipe($.inject(gulp.src(config.specHelpers),
+      { name: 'inject:spechelpers', read: false }))
+    .pipe($.inject(gulp.src(specs),
+      { name: 'inject:specs', read: false }))
+    .pipe($.inject(gulp.src(config.temp + config.templateCache.file),
+      { name: 'inject:templates', read: false }))
+    .pipe(gulp.dest(config.client));
+});
+
 gulp.task('optimize', ['inject', 'test'], function() {
   log('Optimizing js, html, css');
 
@@ -212,7 +247,7 @@ gulp.task('autotest', ['vet', 'templatecache'], function(done) {
 
 ///////////////////
 
-function serve(isDev) {
+function serve(isDev, specRunner) {
   var nodeOptions = {
       script: config.nodeServer,
       delayTime: 1,
@@ -234,7 +269,7 @@ function serve(isDev) {
     })
     .on('start', function(ev) {
       log('*** nodemon started ***');
-      startBrowserSync(isDev);
+      startBrowserSync(isDev, specRunner);
     })
     .on('crash', function() {
       log('*** nodemon crashed: script crashed for some reason ***');
@@ -260,7 +295,7 @@ function notify(options) {
   notifier.notify(notifyOptions);
 }
 
-function startBrowserSync(isDev) {
+function startBrowserSync(isDev, specRunner) {
   if(args.nosync || browserSync.active) {
     return;
   }
@@ -295,15 +330,32 @@ function startBrowserSync(isDev) {
     notify: true,
     reloadDelay: 0
   };
+
+  if(specRunner) {
+    options.startPath = config.specRunnerFile;
+  }
   browserSync(options);
 }
 
 function startTests(singleRun, done) {
+  var child;
+  var fork = require('child_process').fork;
+
   var karma = require('karma').server;
   var excludeFiles = [];
   var serverSpecs = config.serverIntegrationSpecs;
 
-  excludeFiles = serverSpecs;
+  if (args.startServers) {
+    log('Starting server');
+    var savedEnv = process.env;
+    savedEnv.NODE_ENV = 'dev';
+    savedEnv.PORT = 8888;
+    child = fork(config.nodeServer);
+  } else {
+    if(serverSpecs && serverSpecs.length) {
+      excludeFiles = serverSpecs;
+    }
+  }
 
   karma.start({
     configFile: __dirname + '/karma.conf.js',
@@ -313,6 +365,10 @@ function startTests(singleRun, done) {
 
   function karmaCompleted(karmaResult) {
     log('Karma completed!');
+    if(child) {
+      log('Shutting down the child process');
+      child.kill();
+    }
     if(karmaResult === 1) {
       done('karma: tests failed with code: ' + karmaResult);
     } else {

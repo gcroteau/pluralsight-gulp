@@ -5,6 +5,7 @@ module.exports = function() {
   var server = './src/server/';
   var root = './';
   var report = './report/';
+  var specRunnerFile = 'specs.html';
   var wiredep = require('wiredep');
   var bowerFiles = wiredep({devDependencies: true})['js'];
 
@@ -58,13 +59,23 @@ module.exports = function() {
     report: report,
     defaultPort: 7203,
     nodeServer: 'src/server/app.js',
+    specs: [
+      clientApp + '**/*.spec.js'
+    ],
     specHelpers: [
       client + 'test-helpers/*.js'
     ],
     serverIntegrationSpecs: [
       client + 'tests/server-integration/**/*.spec.js'
     ],
-
+    specRunner: client + specRunnerFile,
+    specRunnerFile: specRunnerFile,
+    testLibraries: [
+      'node_modules/mocha/mocha.js',
+      'node_modules/chai/chai.js',
+      'node_modules/mocha-clean/index.js',
+      'node_modules/sinon-chai/lib/sinon-chai.js'
+    ]
   };
 
   config.getWiredepDefaultOptions = function() {
