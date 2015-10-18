@@ -4,6 +4,9 @@ module.exports = function() {
   var temp = './.tmp/';
   var server = './src/server/';
   var root = './';
+  var report = './report/';
+  var wiredep = require('wiredep');
+  var bowerFiles = wiredep({devDependencies: true})['js'];
 
   var config = {
     alljs: [
@@ -52,8 +55,16 @@ module.exports = function() {
       './bower.json'
     ],
     root: root,
+    report: report,
     defaultPort: 7203,
-    nodeServer: 'src/server/app.js'
+    nodeServer: 'src/server/app.js',
+    specHelpers: [
+      client + 'test-helpers/*.js'
+    ],
+    serverIntegrationSpecs: [
+      client + 'tests/server-integration/**/*.spec.js'
+    ],
+
   };
 
   config.getWiredepDefaultOptions = function() {
@@ -65,5 +76,34 @@ module.exports = function() {
     return options;
   };
 
+  config.karma = getKarmaOptions();
+
   return config;
+
+  ///////////////////
+
+  function getKarmaOptions() {
+    var options = {
+      files: [].concat(
+        bowerFiles,
+        config.specHelpers,
+        client + '**/*.module.js',
+        client + '**/*.js',
+        temp + config.templateCache.file,
+        config.serverIntegrationSpecs
+      ),
+      exclude: [],
+      coverage: {
+        dir: report + 'coverage',
+        reporters: [
+          {type: 'html', subdir: 'report-html'},
+          {type: 'lcov', subdir: 'report-lcov'},
+          {type: 'text-summary'} // no subdir => in terminal
+        ]
+      },
+      preprocessors: {}
+    };
+    options.preprocessors[clientApp + '**/!(*.spec)+(.js)'] = ['coverage'];
+    return options;
+  }
 };

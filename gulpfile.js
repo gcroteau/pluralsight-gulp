@@ -3,6 +3,8 @@ var args = require('yargs').argv;
 var browserSync = require('browser-sync');
 var gulp = require('gulp');
 var del = require('del');
+var path = require('path');
+var _ = require('lodash');
 var $ = require('gulp-load-plugins')({lazy: true});
 var port = process.env.PORT || config.defaultPort;
 
@@ -43,7 +45,9 @@ gulp.task('images', ['clean-images'], function() {
   log('Copying and compressing images');
   return gulp
     .src(config.images)
-    .pipe($.imagemin( {optimizationLevel: 4} )) // Do not work with .gif: https://github.com/sindresorhus/gulp-imagemin/issues/125
+    .pipe($.imagemin( {optimizationLevel: 4} ))
+    // Do not work with .gif:
+    // https://github.com/sindresorhus/gulp-imagemin/issues/125
     .pipe(gulp.dest(config.build + 'images'));
 });
 
@@ -112,7 +116,20 @@ gulp.task('inject', ['wiredep', 'styles', 'templatecache'], function() {
     .pipe(gulp.dest(config.client));
 });
 
-gulp.task('optimize', ['inject', 'fonts', 'images'], function() {
+gulp.task('build', ['optimize', 'fonts', 'images'], function() {
+  log('Build everything');
+
+  var msg = {
+    title: 'gulp build',
+    subtitle: 'Deplyoed to the build folder',
+    message: 'Running gulp serve-build'
+  };
+  del(config.temp);
+  log(msg);
+  notify(msg);
+});
+
+gulp.task('optimize', ['inject', 'test'], function() {
   log('Optimizing js, html, css');
 
   var assets = $.useref.assets({searchPath: './'});
@@ -156,7 +173,7 @@ gulp.task('optimize', ['inject', 'fonts', 'images'], function() {
 * --version=1.2.3 will bump will bump to a specific version and ignore other flags
 */
 gulp.task('bump', function() { // So that you can manage the version of your website / web app
-  var msg = "Bumping versions";
+  var msg = 'Bumping versions';
   var type = args.type;
   var version = args.version;
   var options = {};
@@ -177,12 +194,20 @@ gulp.task('bump', function() { // So that you can manage the version of your web
     .pipe(gulp.dest(config.root));
 });
 
-gulp.task('serve-build', ['optimize'], function() {
+gulp.task('serve-build', ['build'], function() {
   serve(false);
 });
 
 gulp.task('serve-dev', ['inject'], function() {
   serve(true);
+});
+
+gulp.task('test', ['vet', 'templatecache'], function(done) {
+  startTests(true, done);
+});
+
+gulp.task('autotest', ['vet', 'templatecache'], function(done) {
+  startTests(false, done);
 });
 
 ///////////////////
@@ -224,6 +249,17 @@ function changeEvent(event) {
   log('File ' + event.path.replace(srcPattern, '') + ' ' + event.type);
 }
 
+function notify(options) {
+  var notifier = require('node-notifier');
+  var notifyOptions = {
+    sound: 'Bottle',
+    contentImage: path.join(__dirname, 'gulp.png'),
+    icon: path.join(__dirname, 'gulp.png')
+  };
+  _.assign(notifyOptions, options);
+  notifier.notify(notifyOptions);
+}
+
 function startBrowserSync(isDev) {
   if(args.nosync || browserSync.active) {
     return;
@@ -261,6 +297,30 @@ function startBrowserSync(isDev) {
   };
   browserSync(options);
 }
+
+function startTests(singleRun, done) {
+  var karma = require('karma').server;
+  var excludeFiles = [];
+  var serverSpecs = config.serverIntegrationSpecs;
+
+  excludeFiles = serverSpecs;
+
+  karma.start({
+    configFile: __dirname + '/karma.conf.js',
+    exclude: excludeFiles,
+    singleRun: !!singleRun
+  }, karmaCompleted);
+
+  function karmaCompleted(karmaResult) {
+    log('Karma completed!');
+    if(karmaResult === 1) {
+      done('karma: tests failed with code: ' + karmaResult);
+    } else {
+      done();
+    }
+  }
+}
+
 
 function clean(path, done) {
   log('Cleaning: ' + $.util.colors.blue(path));
